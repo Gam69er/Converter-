@@ -119,3 +119,51 @@ class MusicMetadataEngine:
         elif ext in [".mp4", ".m4a"]:
             self.embed_mp4(file_path, meta, image_data, lyrics_text)
       
+# ... (Keep all your existing tagger.py code above this) ...
+
+def scan_and_update_library(directory_path, client_id=None, client_secret=None, progress_callback=None):
+    import glob
+    
+    engine = MusicMetadataEngine(client_id, client_secret)
+    if not os.path.exists(directory_path):
+        return f"Folder not found: {directory_path}"
+        
+    supported_exts = ['.mp3', '.m4a', '.mp4']
+    files = []
+    for ext in supported_exts:
+        files.extend(glob.glob(os.path.join(directory_path, f"*{ext}")))
+        
+    if not files:
+        return "No music files found in this folder."
+
+    updated_count = 0
+    for i, file_path in enumerate(files):
+        filename = os.path.basename(file_path)
+        clean_name = os.path.splitext(filename)[0]
+        
+        if progress_callback:
+            progress_callback.onProgress(f"Checking {i+1}/{len(files)}: {clean_name[:15]}...")
+            
+        needs_genre = False
+        ext = os.path.splitext(file_path)[1].lower()
+        
+        try:
+            if ext == '.mp3':
+                audio = MP3(file_path, ID3=ID3)
+                if not audio.tags or 'TCON' not in audio.tags:
+                    needs_genre = True
+            elif ext in ['.mp4', '.m4a']:
+                audio = MP4(file_path)
+                if '\xa9gen' not in audio:
+                    needs_genre = True
+        except:
+            needs_genre = True # If tags are corrupted/missing, force update
+
+        if needs_genre:
+            if progress_callback:
+                progress_callback.onProgress(f"Tagging: {clean_name[:15]}...")
+            engine.process(file_path, clean_name)
+            updated_count += 1
+            
+    return f"Scan Complete! Updated {updated_count} missing genres."
+        
