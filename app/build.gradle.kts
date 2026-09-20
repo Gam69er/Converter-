@@ -49,9 +49,11 @@ chaquopy {
             install("mutagen")
             install("requests")
             install("syncedlyrics")
+            install("ffmpeg-python")
         }
     }
 }
+
 
 dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
