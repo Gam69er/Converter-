@@ -1,6 +1,6 @@
 plugins {
     id("com.android.application")
-    id("kotlin-android")
+    id("org.jetbrains.kotlin.android")
     id("com.chaquo.python")
 }
 
@@ -18,23 +18,26 @@ android {
         ndk {
             abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
         }
-
-        python {
-            pip {
-                install("yt-dlp")
-                install("spotipy")
-                install("mutagen")
-                install("requests")
-                install("syncedlyrics")
-            }
-        }
     }
 
     buildFeatures {
         compose = true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8"
+        kotlinCompilerExtensionVersion = "1.5.8" // Make sure this matches your Kotlin version
+    }
+}
+
+// ✅ Correct Kotlin DSL syntax for Chaquopy
+chaquopy {
+    defaultConfig {
+        pip {
+            install("yt-dlp")
+            install("spotipy")
+            install("mutagen")
+            install("requests")
+            install("syncedlyrics")
+        }
     }
 }
 
