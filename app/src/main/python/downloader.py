@@ -12,19 +12,20 @@ def run_download_and_process(url, choice, search_query, client_id=None, client_s
             percent_str = d.get('_percent_str', '0%').strip()
             progress_callback.onProgress(percent_str)
 
+    # Use universal 'best' format matching to avoid YouTube client restrictions
     ydl_opts = {
+        'format': 'best/ba/b',
         'outtmpl': os.path.join(output_folder, '%(title)s.%(ext)s'),
         'quiet': False,
         'noplaylist': True,
         'rm_cachedir': True,
         'progress_hooks': [handle_progress],
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'web']
+            }
+        }
     }
-
-    if choice == 1:
-        # Bulletproof fallback: Try m4a audio -> any audio -> best combined
-        ydl_opts.update({'format': 'bestaudio[ext=m4a]/bestaudio/best'})
-    else:
-        ydl_opts.update({'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'})
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -45,4 +46,4 @@ def run_download_and_process(url, choice, search_query, client_id=None, client_s
         return "Success"
     except Exception as e:
         return f"ERROR: {str(e)}"
-        
+            
