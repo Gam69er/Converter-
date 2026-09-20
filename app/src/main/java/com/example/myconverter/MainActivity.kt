@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -75,21 +77,38 @@ fun ConverterScreen() {
     var downloadProgress by remember { mutableStateOf("0%") }
     var isWorking by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
-    var showScanDialog by remember { mutableStateOf(false) }
+    
+    // Top-right menu state
+    var menuExpanded by remember { mutableStateOf(false) }
+    var showFolderDialog by remember { mutableStateOf(false) }
+    var customFolderPath by remember { mutableStateOf("/storage/emulated/0/Download") }
 
     val scope = rememberCoroutineScope()
 
-    if (showScanDialog) {
+    // Dialog for scanning a specific folder
+    if (showFolderDialog) {
         AlertDialog(
-            onDismissRequest = { showScanDialog = false },
-            title = { Text("Scan Library for Genres", color = Color.White) },
-            text = { Text("Choose a folder to scan. Files missing a genre will be automatically tagged via Spotify.", color = SpotifyTextMuted) },
+            onDismissRequest = { showFolderDialog = false },
+            title = { Text("Scan Specific Folder", color = Color.White) },
+            text = {
+                Column {
+                    Text("Enter full folder path to scan for missing genres:", color = SpotifyTextMuted, fontSize = 13.sp)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = customFolderPath,
+                        onValueChange = { customFolderPath = it },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = SpotifyGreen, unfocusedBorderColor = Color.DarkGray),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
             containerColor = SpotifyCardBg,
             confirmButton = {
                 TextButton(onClick = {
-                    showScanDialog = false
+                    showFolderDialog = false
                     isWorking = true
-                    statusText = "Scanning Downloads folder..."
+                    statusText = "Scanning folder..."
                     scope.launch(Dispatchers.IO) {
                         try {
                             val py = Python.getInstance()
@@ -97,7 +116,7 @@ fun ConverterScreen() {
                             val callback = object : ProgressCallback {
                                 override fun onProgress(text: String) { downloadProgress = text }
                             }
-                            val result = module.callAttr("scan_and_update_library", "/storage/emulated/0/Download", spotifyClientId, spotifyClientSecret, callback).toString()
+                            val result = module.callAttr("scan_and_update_library", customFolderPath, false, spotifyClientId, spotifyClientSecret, callback).toString()
                             withContext(Dispatchers.Main) {
                                 isWorking = false
                                 statusText = result
@@ -109,33 +128,10 @@ fun ConverterScreen() {
                             }
                         }
                     }
-                }) { Text("Scan Downloads", color = SpotifyGreen) }
+                }) { Text("Start Scan", color = SpotifyGreen) }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    showScanDialog = false
-                    isWorking = true
-                    statusText = "Scanning Music folder..."
-                    scope.launch(Dispatchers.IO) {
-                        try {
-                            val py = Python.getInstance()
-                            val module = py.getModule("tagger")
-                            val callback = object : ProgressCallback {
-                                override fun onProgress(text: String) { downloadProgress = text }
-                            }
-                            val result = module.callAttr("scan_and_update_library", "/storage/emulated/0/Music", spotifyClientId, spotifyClientSecret, callback).toString()
-                            withContext(Dispatchers.Main) {
-                                isWorking = false
-                                statusText = result
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                isWorking = false
-                                statusText = "Scan Failed: ${e.message}"
-                            }
-                        }
-                    }
-                }) { Text("Scan Music", color = SpotifyGreen) }
+                TextButton(onClick = { showFolderDialog = false }) { Text("Cancel", color = Color.Gray) }
             }
         )
     }
@@ -145,13 +141,68 @@ fun ConverterScreen() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = "Safe YT Converter", fontSize = 26.sp, fontWeight = FontWeight.Bold, color = Color.White)
-            Text(text = "With Spotify Artwork & Synced Lyrics", fontSize = 13.sp, color = SpotifyGreen)
+        // Top Bar with Header and 3-Line Menu Button
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(text = "Safe YT Converter", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                Text(text = "With Spotify Artwork & Synced Lyrics", fontSize = 12.sp, color = SpotifyGreen)
+            }
+
+            Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(imageVector = Icons.Default.Menu, contentDescription = "Menu", tint = Color.White)
+                }
+
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false },
+                    modifier = Modifier.width(240.dp)
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Scan Specific Folder") },
+                        onClick = {
+                            menuExpanded = false
+                            showFolderDialog = true
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Scan ALL Songs on Device") },
+                        onClick = {
+                            menuExpanded = false
+                            isWorking = true
+                            statusText = "Scanning full device..."
+                            scope.launch(Dispatchers.IO) {
+                                try {
+                                    val py = Python.getInstance()
+                                    val module = py.getModule("tagger")
+                                    val callback = object : ProgressCallback {
+                                        override fun onProgress(text: String) { downloadProgress = text }
+                                    }
+                                    val result = module.callAttr("scan_and_update_library", "", true, spotifyClientId, spotifyClientSecret, callback).toString()
+                                    withContext(Dispatchers.Main) {
+                                        isWorking = false
+                                        statusText = result
+                                    }
+                                } catch (e: Exception) {
+                                    withContext(Dispatchers.Main) {
+                                        isWorking = false
+                                        statusText = "Full Scan Failed: ${e.message}"
+                                    }
+                                }
+                            }
+                        }
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(20.dp))
 
+        // Main Converter Inputs
         Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SpotifyCardBg), shape = RoundedCornerShape(16.dp)) {
             Column(modifier = Modifier.padding(16.dp)) {
                 OutlinedTextField(
@@ -183,6 +234,7 @@ fun ConverterScreen() {
 
         Spacer(modifier = Modifier.height(20.dp))
 
+        // Progress & Status Text
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
             if (isWorking) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(6.dp), color = SpotifyGreen, trackColor = Color.DarkGray)
@@ -196,44 +248,37 @@ fun ConverterScreen() {
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Button(
-                onClick = { showScanDialog = true },
-                enabled = !isWorking,
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray, contentColor = Color.White),
-                modifier = Modifier.weight(1f).height(52.dp).padding(end = 8.dp)
-            ) { Text("BATCH SCAN") }
-
-            Button(
-                onClick = {
-                    isWorking = true
-                    statusText = "Downloading..."
-                    scope.launch(Dispatchers.IO) {
-                        try {
-                            val py = Python.getInstance()
-                            val module = py.getModule("downloader")
-                            val callback = object : ProgressCallback {
-                                override fun onProgress(percentage: String) { downloadProgress = percentage }
-                            }
-                            val result = module.callAttr("run_download_and_process", url, selectedFormat, searchQuery, spotifyClientId, spotifyClientSecret, callback).toString()
-                            withContext(Dispatchers.Main) {
-                                isWorking = false
-                                statusText = if (result == "Success") "Complete! Saved to Downloads" else result
-                            }
-                        } catch (e: Exception) {
-                            withContext(Dispatchers.Main) {
-                                isWorking = false
-                                statusText = "Failed: ${e.message}"
-                            }
+        // Download Button
+        Button(
+            onClick = {
+                isWorking = true
+                statusText = "Downloading..."
+                scope.launch(Dispatchers.IO) {
+                    try {
+                        val py = Python.getInstance()
+                        val module = py.getModule("downloader")
+                        val callback = object : ProgressCallback {
+                            override fun onProgress(percentage: String) { downloadProgress = percentage }
+                        }
+                        val result = module.callAttr("run_download_and_process", url, selectedFormat, searchQuery, spotifyClientId, spotifyClientSecret, callback).toString()
+                        withContext(Dispatchers.Main) {
+                            isWorking = false
+                            statusText = if (result == "Success") "Complete! Saved to Downloads" else result
+                        }
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            isWorking = false
+                            statusText = "Failed: ${e.message}"
                         }
                     }
-                },
-                enabled = !isWorking && url.isNotBlank(),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = SpotifyGreen, contentColor = Color.Black),
-                modifier = Modifier.weight(1f).height(52.dp).padding(start = 8.dp)
-            ) { Text("DOWNLOAD", fontWeight = FontWeight.Bold) }
+                }
+            },
+            enabled = !isWorking && url.isNotBlank(),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = SpotifyGreen, contentColor = Color.Black),
+            modifier = Modifier.fillMaxWidth().height(52.dp)
+        ) {
+            Text("DOWNLOAD", fontWeight = FontWeight.Bold, fontSize = 16.sp)
         }
     }
 }
