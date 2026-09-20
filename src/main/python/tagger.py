@@ -1,0 +1,129 @@
+import os
+import requests
+import syncedlyrics
+import mutagen
+from mutagen.mp3 import MP3
+from mutagen.id3 import ID3, TIT2, TPE1, TALB, TCON, APIC, USLT, ID3NoHeaderError
+from mutagen.mp4 import MP4, MP4Cover
+
+try:
+    import spotipy
+    from spotipy.oauth2 import SpotifyClientCredentials
+    HAS_SPOTIPY = True
+except ImportError:
+    HAS_SPOTIPY = False
+
+
+class MusicMetadataEngine:
+    def __init__(self, client_id: str = None, client_secret: str = None):
+        self.sp = None
+        if HAS_SPOTIPY and client_id and client_secret:
+            try:
+                auth = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
+                self.sp = spotipy.Spotify(client_credentials_manager=auth)
+            except Exception as e:
+                print(f"[!] Spotify auth failed: {e}")
+
+    def fetch_spotify_data(self, query: str) -> dict:
+        """Searches Spotify for track title, artist, genre, and album cover."""
+        if not self.sp:
+            return {"title": query, "artist": "Unknown Artist", "album": "Single", "genre": "Music", "cover_url": None}
+
+        try:
+            results = self.sp.search(q=query, type="track", limit=1)
+            items = results.get("tracks", {}).get("items", [])
+            if not items:
+                return {"title": query, "artist": "Unknown Artist", "album": "Single", "genre": "Music", "cover_url": None}
+
+            track = items[0]
+            artist_id = track["artists"][0]["id"]
+            artist_info = self.sp.artist(artist_id)
+            genres = artist_info.get("genres", [])
+
+            return {
+                "title": track["name"],
+                "artist": ", ".join([a["name"] for a in track["artists"]]),
+                "album": track["album"]["name"],
+                "genre": genres[0].title() if genres else "Pop",
+                "cover_url": track["album"]["images"][0]["url"] if track["album"]["images"] else None
+            }
+        except Exception as e:
+            print(f"[-] Spotify search error: {e}")
+            return {"title": query, "artist": "Unknown Artist", "album": "Single", "genre": "Music", "cover_url": None}
+
+    def fetch_synced_lyrics(self, query: str, base_file_path: str) -> str:
+        """Downloads synchronized (.lrc) lyrics and saves an .lrc sidecar file."""
+        try:
+            print(f"[+] Searching synced lyrics for: {query}")
+            lrc_content = syncedlyrics.search(query)
+            if lrc_content:
+                # Save sidecar .lrc file for Musicolet / Android players
+                lrc_path = os.path.splitext(base_file_path)[0] + ".lrc"
+                with open(lrc_path, "w", encoding="utf-8") as f:
+                    f.write(lrc_content)
+                print(f"[+] Saved .lrc lyrics file: {lrc_path}")
+                return lrc_content
+        except Exception as e:
+            print(f"[-] Synced lyrics lookup failed: {e}")
+        return None
+
+    def embed_mp3(self, file_path: str, meta: dict, image_data: bytes, lyrics: str):
+        try:
+            audio = MP3(file_path, ID3=ID3)
+        except ID3NoHeaderError:
+            audio = MP3(file_path)
+            audio.add_tags()
+
+        if meta.get("title"):
+            audio.tags.add(TIT2(encoding=3, text=meta["title"]))
+        if meta.get("artist"):
+            audio.tags.add(TPE1(encoding=3, text=meta["artist"]))
+        if meta.get("album"):
+            audio.tags.add(TALB(encoding=3, text=meta["album"]))
+        if meta.get("genre"):
+            audio.tags.add(TCON(encoding=3, text=meta["genre"]))
+
+        if image_data:
+            audio.tags.add(APIC(encoding=3, mime="image/jpeg", type=3, desc="Cover", data=image_data))
+
+        if lyrics:
+            audio.tags.add(USLT(encoding=3, lang="eng", desc="Lyrics", text=lyrics))
+
+        audio.save()
+
+    def embed_mp4(self, file_path: str, meta: dict, image_data: bytes, lyrics: str):
+        audio = MP4(file_path)
+        if meta.get("title"):
+            audio["\xa9nam"] = meta["title"]
+        if meta.get("artist"):
+            audio["\xa9ART"] = meta["artist"]
+        if meta.get("album"):
+            audio["\xa9alb"] = meta["album"]
+        if meta.get("genre"):
+            audio["\xa9gen"] = meta["genre"]
+        if image_data:
+            audio["covr"] = [MP4Cover(image_data, imageformat=MP4Cover.FORMAT_JPEG)]
+        if lyrics:
+            audio["\xa9lyr"] = lyrics
+        audio.save()
+
+    def process(self, file_path: str, search_query: str):
+        meta = self.fetch_spotify_data(search_query)
+        
+        # 1. Download Album Cover
+        image_data = None
+        if meta.get("cover_url"):
+            res = requests.get(meta["cover_url"], timeout=10)
+            if res.status_code == 200:
+                image_data = res.content
+
+        # 2. Fetch Synced Lyrics (.lrc file & text)
+        lyrics_text = self.fetch_synced_lyrics(f"{meta['artist']} {meta['title']}", file_path)
+
+        # 3. Embed tags into audio/video
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext == ".mp3":
+            self.embed_mp3(file_path, meta, image_data, lyrics_text)
+        elif ext in [".mp4", ".m4a"]:
+            self.embed_mp4(file_path, meta, image_data, lyrics_text)
+          
