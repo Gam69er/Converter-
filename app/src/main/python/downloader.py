@@ -21,20 +21,14 @@ def run_download_and_process(url, choice, search_query, client_id=None, client_s
     }
 
     if choice == 1:
-        # Best audio download
+        # Fallback format string to catch whatever raw audio YouTube provides
         ydl_opts.update({
-            'format': 'bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
+            'format': 'ba/ba*/bestaudio/best',
         })
     else:
-        # Video download
+        # Standard video download
         ydl_opts.update({
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-            'merge_output_format': 'mp4',
+            'format': 'b/bestvideo+bestaudio/best',
         })
 
     try:
@@ -42,19 +36,17 @@ def run_download_and_process(url, choice, search_query, client_id=None, client_s
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
 
-        # Find the actual downloaded file on disk (handles extension changes like .m4a -> .mp3)
+        # Safely locate the downloaded file on disk
         base_path = os.path.splitext(filename)[0]
         matching_files = glob.glob(f"{glob.escape(base_path)}.*")
         
-        # Exclude leftover temp or .lrc files
         media_files = [f for f in matching_files if not f.endswith('.lrc') and not f.endswith('.part')]
-        
         final_file = media_files[0] if media_files else filename
 
         # Fallback search term if override is blank
         final_query = search_query if search_query and search_query.strip() else info.get('title', '')
         
-        # Process tags and synced lyrics
+        # Run Spotify metadata embedding and synced lyrics download
         engine = MusicMetadataEngine(client_id, client_secret)
         engine.process(final_file, final_query)
 
