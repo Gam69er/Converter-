@@ -20,7 +20,6 @@ android {
         }
     }
 
-    // THIS FIXES THE MOST COMMON JETPACK COMPOSE LAUNCH CRASH
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -39,6 +38,11 @@ android {
 
 chaquopy {
     defaultConfig {
+        sourceSets {
+            getByName("main") {
+                srcDir("src/main/python")
+            }
+        }
         pip {
             install("yt-dlp")
             install("spotipy")
