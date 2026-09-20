@@ -49,7 +49,6 @@ chaquopy {
             install("mutagen")
             install("requests")
             install("syncedlyrics")
-            install("ffmpeg-python")
         }
     }
 }
