@@ -12,8 +12,10 @@ def run_download_and_process(url, choice, search_query, client_id=None, client_s
             percent_str = d.get('_percent_str', '0%').strip()
             progress_callback.onProgress(percent_str)
 
-    # 100% Bulletproof format logic
-    format_string = 'bestaudio[ext=m4a]/best[ext=mp4]/best' if choice == 1 else 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
+    # Removes all extension restrictions. 
+    # 'ba/b' = Get best audio stream. If none exists, get best combined video/audio file.
+    # 'b' = Get best combined video/audio file.
+    format_string = 'ba/b' if choice == 1 else 'b'
 
     ydl_opts = {
         'format': format_string,
@@ -21,12 +23,7 @@ def run_download_and_process(url, choice, search_query, client_id=None, client_s
         'quiet': False,
         'noplaylist': True,
         'rm_cachedir': True,
-        'progress_hooks': [handle_progress],
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['android', 'web']
-            }
-        }
+        'progress_hooks': [handle_progress]
     }
 
     try:
@@ -34,6 +31,7 @@ def run_download_and_process(url, choice, search_query, client_id=None, client_s
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
 
+        # Locate the downloaded file regardless of what extension yt-dlp chose
         base_path = os.path.splitext(filename)[0]
         matching_files = glob.glob(f"{glob.escape(base_path)}.*")
         
@@ -43,7 +41,13 @@ def run_download_and_process(url, choice, search_query, client_id=None, client_s
         final_query = search_query if search_query and search_query.strip() else info.get('title', '')
         
         engine = MusicMetadataEngine(client_id, client_secret)
-        engine.process(final_file, final_query)
+        
+        # We wrap the engine process in a try block here too, just in case 
+        # YouTube returns an incredibly weird format that Mutagen can't tag.
+        try:
+            engine.process(final_file, final_query)
+        except Exception:
+            pass # File downloaded successfully but couldn't be tagged
 
         return "Success"
     except Exception as e:
