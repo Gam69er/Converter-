@@ -20,15 +20,23 @@ android {
         }
     }
 
+    // THIS FIXES THE MOST COMMON JETPACK COMPOSE LAUNCH CRASH
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
     buildFeatures {
         compose = true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.8" // Make sure this matches your Kotlin version
+        kotlinCompilerExtensionVersion = "1.5.8"
     }
 }
 
-// ✅ Correct Kotlin DSL syntax for Chaquopy
 chaquopy {
     defaultConfig {
         pip {
