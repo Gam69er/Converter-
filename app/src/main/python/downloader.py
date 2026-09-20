@@ -12,9 +12,11 @@ def run_download_and_process(url, choice, search_query, client_id=None, client_s
             percent_str = d.get('_percent_str', '0%').strip()
             progress_callback.onProgress(percent_str)
 
-    # Use universal 'best' format matching to avoid YouTube client restrictions
+    # 100% Bulletproof format logic
+    format_string = 'bestaudio[ext=m4a]/best[ext=mp4]/best' if choice == 1 else 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best'
+
     ydl_opts = {
-        'format': 'best/ba/b',
+        'format': format_string,
         'outtmpl': os.path.join(output_folder, '%(title)s.%(ext)s'),
         'quiet': False,
         'noplaylist': True,
@@ -46,4 +48,4 @@ def run_download_and_process(url, choice, search_query, client_id=None, client_s
         return "Success"
     except Exception as e:
         return f"ERROR: {str(e)}"
-            
+        
