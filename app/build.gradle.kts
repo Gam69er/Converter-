@@ -36,22 +36,7 @@ android {
     }
 }
 
-chaquopy {
-    defaultConfig {
-        sourceSets {
-            getByName("main") {
-                srcDir("src/main/python")
-            }
-        }
-        pip {
-            install("yt-dlp")
-            install("spotipy")
-            install("mutagen")
-            install("requests")
-            install("syncedlyrics")
-        }
-    }
-}
+
 
 
 dependencies {
