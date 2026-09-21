@@ -78,7 +78,6 @@ fun ConverterScreen() {
     var isWorking by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
 
-    // Scanner UI States
     var menuExpanded by remember { mutableStateOf(false) }
     var showFolderDialog by remember { mutableStateOf(false) }
     var customFolderPath by remember { mutableStateOf("/storage/emulated/0/Download") }
@@ -102,7 +101,7 @@ fun ConverterScreen() {
             title = { Text("Scan Specific Folder", color = Color.White) },
             text = {
                 Column {
-                    Text("Enter full folder path to scan for missing genres:", color = SpotifyTextMuted, fontSize = 13.sp)
+                    Text("Enter full folder path to scan for missing tags:", color = SpotifyTextMuted, fontSize = 13.sp)
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = customFolderPath,
@@ -138,7 +137,6 @@ fun ConverterScreen() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Top Bar with Hamburger Menu
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -186,13 +184,13 @@ fun ConverterScreen() {
         Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = SpotifyCardBg), shape = RoundedCornerShape(16.dp)) {
             Column(modifier = Modifier.padding(16.dp)) {
                 OutlinedTextField(
-                    value = url, onValueChange = { url = it }, label = { Text("Paste Media URL (YouTube, SoundCloud, etc.)", color = SpotifyTextMuted) },
+                    value = url, onValueChange = { url = it }, label = { Text("Paste URL or Type Song Name", color = SpotifyTextMuted) },
                     singleLine = true, modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = SpotifyGreen, unfocusedBorderColor = Color.DarkGray, focusedLabelColor = SpotifyGreen)
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
-                    value = searchQuery, onValueChange = { searchQuery = it }, label = { Text("Song & Artist Name (Optional)", color = SpotifyTextMuted) },
+                    value = searchQuery, onValueChange = { searchQuery = it }, label = { Text("Song & Artist Name Override (Optional)", color = SpotifyTextMuted) },
                     singleLine = true, modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = SpotifyGreen, unfocusedBorderColor = Color.DarkGray, focusedLabelColor = SpotifyGreen)
                 )
@@ -227,7 +225,7 @@ fun ConverterScreen() {
         Button(
             onClick = {
                 isWorking = true
-                statusText = "Sending request to Termux server..."
+                statusText = "Processing request..."
                 scope.launch(Dispatchers.IO) {
                     val result = sendDownloadRequest(url, selectedFormat, searchQuery, spotifyClientId, spotifyClientSecret)
                     withContext(Dispatchers.Main) {
@@ -295,7 +293,7 @@ private fun sendScanRequest(path: String, scanEntireDevice: Boolean, clientId: S
         conn.setRequestProperty("Content-Type", "application/json")
         conn.doOutput = true
         conn.connectTimeout = 5000
-        conn.readTimeout = 300000 // 5 minute timeout for large libraries
+        conn.readTimeout = 300000
 
         conn.outputStream.use { os -> os.write(jsonPayload.toByteArray(Charsets.UTF_8)) }
 
